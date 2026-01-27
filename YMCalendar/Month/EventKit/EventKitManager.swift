@@ -36,6 +36,9 @@ final public class EventKitManager {
         case .denied, .restricted:
             isGranted = false
             completion?(isGranted)
+        @unknown default:
+            isGranted = false
+            completion?(isGranted)
         }
     }
 
