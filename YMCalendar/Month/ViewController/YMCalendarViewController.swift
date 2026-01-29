@@ -7,7 +7,6 @@
 //
 
 import Foundation
-import UIKit
 import EventKit
 
 open class YMCalendarViewController: UIViewController {
@@ -21,14 +20,6 @@ open class YMCalendarViewController: UIViewController {
         }
     }
 
-    public override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: Bundle?) {
-        super.init(nibName: nibNameOrNil, bundle: nibBundleOrNil)
-    }
-    
-    public required init?(coder: NSCoder) {
-        super.init(coder: coder)
-    }
-    
     open override func loadView() {
         calendarView = YMCalendarView()
     }

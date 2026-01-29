@@ -255,29 +255,11 @@ extension YMCalendarView {
 
     // MARK: - Utils
 
-    private func monthStartDate(for section: Int) -> Date {
-        var comp = DateComponents()
-        comp.month = section
-        return calendar.date(byAdding: comp, to: dateFrom(monthDate: startDate))!
-    }
-
-    private func leadingDays(for section: Int) -> Int {
-        let firstDay = monthStartDate(for: section)
-        let weekday = calendar.component(.weekday, from: firstDay)
-        return (weekday + 7 - calendar.firstWeekday) % 7
-    }
-
-    private func totalItems(for section: Int) -> Int {
-        let lead = leadingDays(for: section)
-        let days = calendar.numberOfDaysInMonth(date: monthStartDate(for: section))
-        let rows = Int(ceil(Double(lead + days) / 7.0))
-        return rows * 7
-    }
-
     private func dateAt(_ indexPath: IndexPath) -> Date {
-        let start = monthStartDate(for: indexPath.section)
-        let offset = indexPath.item - leadingDays(for: indexPath.section)
-        return calendar.date(byAdding: .day, value: offset, to: start)!
+        var comp   = DateComponents()
+        comp.month = indexPath.section
+        comp.day   = indexPath.row
+        return calendar.date(byAdding: comp, to: dateFrom(monthDate: startDate))!
     }
 
     private func indexPathForDate(_ date: Date) -> IndexPath? {
@@ -286,19 +268,15 @@ extension YMCalendarView {
                 return nil
             }
         }
-
-        // Find section by month diff
-        let comps = calendar.dateComponents([.month], from: dateFrom(monthDate: startDate), to: date)
-        guard let month = comps.month else { return nil }
-        let sectionStart = monthStartDate(for: month)
-        let lead = leadingDays(for: month)
-        let dayOffset = calendar.dateComponents([.day], from: sectionStart, to: date).day ?? 0
-        let item = lead + dayOffset
-        return IndexPath(item: item, section: month)
+        let comps = calendar.dateComponents([.month, .day], from: dateFrom(monthDate: startDate), to: date)
+        guard let day = comps.day, let month = comps.month else {
+            return nil
+        }
+        return IndexPath(item: day, section: month)
     }
 
     private func startDayAtMonth(in section: Int) -> Date {
-        return monthStartDate(for: section)
+        return dateAt(IndexPath(item: 0, section: section))
     }
 
     private func column(at indexPath: IndexPath) -> Int {
@@ -567,18 +545,16 @@ extension YMCalendarView {
     }
 
     private func monthRowView(at indexPath: IndexPath) -> YMMonthWeekView {
-        let kind = YMMonthWeekView.ym.kind
-        let reuseId = YMMonthWeekView.ym.identifier
-        let weekView = collectionView.dequeueReusableSupplementaryView(
-            ofKind: kind,
-            withReuseIdentifier: reuseId,
-            for: indexPath
-        ) as! YMMonthWeekView
-        // 이벤트 row는 "현재 월" 기준으로 계산되도록 rowStart를 현재 월의 day index로 만든다.
-        // (이전/다음 달 날짜를 표시하기 위해 dateAt(indexPath)는 이전 달 날짜가 될 수 있음)
-        let monthStart = monthStartDate(for: indexPath.section)
-        let rowStart = calendar.date(byAdding: .day, value: indexPath.item, to: monthStart) ?? monthStart
-        weekView.eventsView = eventsRowView(at: rowStart)
+        var weekView: YMMonthWeekView!
+        while true {
+            let v = collectionView.ym.dequeue(YMMonthWeekView.self, for: indexPath)
+            if !visibleEventRows.contains(v.eventsView) {
+                weekView = v
+                break
+            }
+        }
+
+        weekView.eventsView = eventsRowView(at: dateAt(indexPath))
         return weekView
     }
 }
@@ -591,7 +567,8 @@ extension YMCalendarView: UICollectionViewDataSource {
     }
 
     public func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return totalItems(for: section)
+        let startDay = startDayAtMonth(in: section)
+        return calendar.numberOfDaysInMonth(date: startDay)
     }
 
     public func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
@@ -628,8 +605,10 @@ extension YMCalendarView: UICollectionViewDataSource {
     }
 
     private func backgroundView(at indexPath: IndexPath) -> UICollectionReusableView {
-        let numRows = totalItems(for: indexPath.section) / 7
-        let lastColumn = 6
+        let date = startDayAtMonth(in: indexPath.section)
+
+        let lastColumn = column(at: IndexPath(item: 0, section: indexPath.section + 1))
+        let numRows = calendar.numberOfWeeksInMonth(date: date)
 
         let view = collectionView.ym.dequeue(YMMonthBackgroundView.self, for: indexPath)
         view.lastColumn = lastColumn
@@ -759,11 +738,9 @@ extension YMCalendarView: UICollectionViewDelegate {
     public func scrollViewDidScroll(_ scrollView: UIScrollView) {
         recenterIfNeeded()
 
-        let centerPoint = CGPoint(x: collectionView.bounds.midX, y: collectionView.bounds.midY)
-        if let indexPath = collectionView.indexPathForItem(at: centerPoint) {
-            // 이전/다음 달 날짜가 보이더라도 "해당 섹션의 월" 기준으로 표시 월을 계산
-            let sectionMonthStart = monthStartDate(for: indexPath.section)
-            let startMonth = calendar.startOfMonthForDate(sectionMonthStart)
+        if let indexPath = collectionView.indexPathForItem(at: center) {
+            let date = dateAt(indexPath)
+            let startMonth = calendar.startOfMonthForDate(date)
             if displayingMonthDate != startMonth {
                 displayingMonthDate = startMonth
                 delegate?.calendarView?(self, didMoveMonthOfStartDate: startMonth)

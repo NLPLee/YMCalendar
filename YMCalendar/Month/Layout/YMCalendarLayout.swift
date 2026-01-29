@@ -62,37 +62,32 @@ final class YMCalendarLayout: UICollectionViewLayout {
         var y: CGFloat = 0
 
         for month in 0..<numberOfMonths {
-            // YMCalendarView에서 section 당 item을 7의 배수(5주/6주)로 제공하도록 커스터마이즈한 경우를 지원
-            // (이전/다음 달 날짜까지 표시). 이 경우 column 오프셋을 사용하지 않고 0부터 7개씩 배치한다.
-            var column = 0
-            let numberOfItems = collectionView.numberOfItems(inSection: month)
-            let numberOfRows = max(1, Int(ceil(Double(numberOfItems) / 7.0)))
+            var column = dataSource?.collectionView(collectionView, layout: self, columnAt: IndexPath(item: 0, section: month)) ?? 0
+            let numberOfDaysInMonth = collectionView.numberOfItems(inSection: month)
+            let numberOfRows = Int(ceil(Double(column + numberOfDaysInMonth) / 7.0))
             let rowHeight = collectionView.bounds.height / CGFloat(numberOfRows)
             var day = 0
 
             var monthRect = CGRect()
-            if scrollDirection == .vertical {
-                monthRect.origin = CGPoint(x: 0, y: y)
-            } else {
-                monthRect.origin = CGPoint(x: x, y: 0)
-            }
+            monthRect.origin = CGPoint(x: x, y: y)
 
             for _ in 0..<numberOfRows {
-                let remaining = max(0, numberOfItems - day)
-                let colRange = NSRange(location: 0, length: min(7, remaining))
+                let colRange = NSRange(location: column, length: min(7 - column, numberOfDaysInMonth - day))
                 let indexPath = IndexPath(item: day, section: month)
                 let attributes = UICollectionViewLayoutAttributes(forSupplementaryViewOfKind: YMMonthWeekView.ym.kind, with: indexPath)
-                let width = widthForColumnRange(NSRange(location: 0, length: 7))
+                let width = widthForColumnRange(NSRange(location: column, length: colRange.length))
 
                 if scrollDirection == .vertical {
-                    attributes.frame = CGRect(x: 0, y: y + dayHeaderHeight + 4, width: width, height: rowHeight - dayHeaderHeight - 4)
+                    let px = widthForColumnRange(NSRange(location: 0, length: column))
+                    attributes.frame = CGRect(x: px, y: y + dayHeaderHeight + 4, width: width, height: rowHeight - dayHeaderHeight - 4)
                 } else {
-                    attributes.frame = CGRect(x: x, y: y + dayHeaderHeight + 4, width: width, height: rowHeight - dayHeaderHeight - 4)
+                    let width = widthForColumnRange(NSRange(location: column, length: colRange.length))
+                    attributes.frame = CGRect(x: x + widthForColumnRange(NSRange(location: 0, length: column)), y: y + dayHeaderHeight + 4, width: width, height: rowHeight - dayHeaderHeight - 4)
                 }
                 attributes.zIndex = 1
                 weeksAttrDict.updateValue(attributes, forKey: indexPath)
 
-                while column < 7 && day < numberOfItems {
+                while column < NSMaxRange(colRange) {
                     let path = IndexPath(item: day, section: month)
                     let attributes = UICollectionViewLayoutAttributes(forCellWith: path)
 
@@ -118,9 +113,10 @@ final class YMCalendarLayout: UICollectionViewLayout {
             if scrollDirection == .vertical {
                 monthRect.size = CGSize(width: collectionView.bounds.size.width, height: y - monthRect.origin.y)
             } else {
-                monthRect.size = CGSize(width: collectionView.bounds.size.width, height: collectionView.bounds.height)
                 x += collectionView.bounds.size.width
                 y = 0
+
+                monthRect.size = CGSize(width: x - monthRect.origin.x, height: collectionView.bounds.height)
             }
 
             let path = IndexPath(item: 0, section: month)
