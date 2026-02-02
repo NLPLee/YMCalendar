@@ -545,18 +545,18 @@ extension YMCalendarView {
     }
 
     private func monthRowView(at indexPath: IndexPath) -> YMMonthWeekView {
-        var weekView: YMMonthWeekView!
-        while true {
-            let v = collectionView.ym.dequeue(YMMonthWeekView.self, for: indexPath)
-            if !visibleEventRows.contains(v.eventsView) {
-                weekView = v
-                break
-            }
-        }
+           let kind = YMMonthWeekView.ym.kind
+           let reuseId = YMMonthWeekView.self.ym.identifier
 
-        weekView.eventsView = eventsRowView(at: dateAt(indexPath))
-        return weekView
-    }
+           let weekView = collectionView.dequeueReusableSupplementaryView(
+               ofKind: kind,
+               withReuseIdentifier: reuseId,
+               for: indexPath
+           ) as! YMMonthWeekView
+
+           weekView.eventsView = eventsRowView(at: dateAt(indexPath))
+           return weekView
+       }
 }
 
 extension YMCalendarView: UICollectionViewDataSource {

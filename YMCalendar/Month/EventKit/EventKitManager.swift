@@ -28,12 +28,15 @@ final public class EventKitManager {
     public func checkEventStoreAccessForCalendar(completion: EventSaveCompletionBlockType?) {
         let status = EKEventStore.authorizationStatus(for: .event)
         switch status {
-        case .authorized:
+        case .authorized, .fullAccess, .writeOnly:
             isGranted = true
             completion?(isGranted)
         case .notDetermined:
             requestCalendarAccess(completion: completion)
         case .denied, .restricted:
+            isGranted = false
+            completion?(isGranted)
+        @unknown default:
             isGranted = false
             completion?(isGranted)
         }
