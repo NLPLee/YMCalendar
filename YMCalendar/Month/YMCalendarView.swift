@@ -200,6 +200,7 @@ final public class YMCalendarView: UIView, YMCalendarAppearance {
     private var selectedEventIndex: Int = 0
 
     private var displayingMonthDate: Date = Date()
+    private var currentVisibleMonth: MonthDate?
 
     private var numberOfLoadedMonths: Int {
         if let range = monthRange {
@@ -385,11 +386,41 @@ extension YMCalendarView {
             return
         }
 
+        // 현재 보이는 월 저장
+        currentVisibleMonth = month
+
+        // startDate가 목표 월과 너무 멀리 떨어져 있으면 초기화
+        // offsetForMonth가 올바른 값을 반환하도록 startDate를 목표 월 근처로 설정
+        let currentDiff = abs(startDate.monthDiff(with: month))
+        if currentDiff > 6 {  // 6개월 이상 차이나면 startDate 초기화
+            let offset = (numberOfLoadedMonths - 1) / 2
+            let newStart = month.add(month: -offset)
+            var finalStart = newStart
+            if let range = monthRange, let maxStartDate = maxStartDate {
+                if newStart < range.start {
+                    finalStart = range.start
+                } else if newStart > maxStartDate {
+                    finalStart = maxStartDate
+                }
+            }
+            startDate = finalStart
+            collectionView.reloadData()
+        }
+
+        // 스크롤 수행
         let offset = offsetForMonth(month)
         if scrollDirection == .vertical {
             collectionView.setContentOffset(CGPoint(x: 0, y: offset), animated: animated)
         } else {
             collectionView.setContentOffset(CGPoint(x: offset, y: 0), animated: animated)
+        }
+
+        // 헤더 업데이트
+        let centerDate = dateFrom(monthDate: month)
+        let startMonth = calendar.startOfMonthForDate(centerDate)
+        if displayingMonthDate != startMonth {
+            displayingMonthDate = startMonth
+            delegate?.calendarView?(self, didMoveMonthOfStartDate: startMonth)
         }
 
         delegate?.calendarViewDidScroll?(self)
@@ -440,7 +471,7 @@ extension YMCalendarView {
         return diff
     }
 
-    private func recenterIfNeeded() {
+    private func recenterIfNeeded() -> Bool {
         let offset, content, bounds, boundsMax: CGFloat
         switch scrollDirection {
         case .vertical:
@@ -456,13 +487,15 @@ extension YMCalendarView {
         }
 
         guard content > 0 else {
-            return
+            return false
         }
+
+        // 현재 보이는 월을 계산 (startDate 변경 전에 계산)
+        let centerMonth = monthFromOffset(offset)
+        currentVisibleMonth = centerMonth
 
         if offset < bounds || boundsMax + bounds > content {
             let oldStart = startDate
-
-            let centerMonth = monthFromOffset(offset)
             let monthOffset = adjustStartDateToCenter(date: centerMonth)
 
             if monthOffset != 0 {
@@ -477,8 +510,10 @@ extension YMCalendarView {
                     contentOffset.x = k + offset
                 }
                 collectionView.contentOffset = contentOffset
+                return true
             }
         }
+        return false
     }
 }
 
@@ -736,11 +771,44 @@ extension YMCalendarView: UICollectionViewDelegate {
     // MARK: - UIScrollViewDelegate
 
     public func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        recenterIfNeeded()
+        let hadReload = recenterIfNeeded()
 
-        if let indexPath = collectionView.indexPathForItem(at: center) {
+        // 현재 화면 중앙의 indexPath를 사용하여 정확한 월 계산
+        let centerPoint: CGPoint
+        switch scrollDirection {
+        case .vertical:
+            centerPoint = CGPoint(x: collectionView.bounds.midX, y: collectionView.bounds.midY)
+        case .horizontal:
+            centerPoint = CGPoint(x: collectionView.bounds.midX, y: collectionView.bounds.midY)
+        }
+        
+        if let indexPath = collectionView.indexPathForItem(at: centerPoint) {
             let date = dateAt(indexPath)
             let startMonth = calendar.startOfMonthForDate(date)
+            
+            // currentVisibleMonth 업데이트
+            let month = monthDate(from: date)
+            currentVisibleMonth = month
+            
+            if displayingMonthDate != startMonth {
+                displayingMonthDate = startMonth
+                delegate?.calendarView?(self, didMoveMonthOfStartDate: startMonth)
+            }
+        } else if !hadReload {
+            // indexPath를 얻을 수 없을 때만 오프셋으로 계산 (fallback)
+            let offset: CGFloat
+            switch scrollDirection {
+            case .vertical:
+                offset = max(collectionView.contentOffset.y, 0)
+            case .horizontal:
+                offset = max(collectionView.contentOffset.x, 0)
+            }
+            
+            let centerMonth = monthFromOffset(offset)
+            currentVisibleMonth = centerMonth
+            
+            let centerDate = dateFrom(monthDate: centerMonth)
+            let startMonth = calendar.startOfMonthForDate(centerDate)
             if displayingMonthDate != startMonth {
                 displayingMonthDate = startMonth
                 delegate?.calendarView?(self, didMoveMonthOfStartDate: startMonth)
