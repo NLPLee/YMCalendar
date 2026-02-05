@@ -14,6 +14,11 @@ final class YMMonthDayCollectionCell: UICollectionViewCell {
 
     let dayLabel = UILabel()
 
+    /// When true, selection background fills the entire cell (contentView.bounds). When false, shows a centered circle that fits in the cell.
+    var selectionBackgroundFillsCell: Bool = false
+
+    private var isDaySelected: Bool = false
+
     var dayLabelColor: UIColor = .black {
         didSet {
             dayLabel.textColor = dayLabelColor
@@ -29,6 +34,9 @@ final class YMMonthDayCollectionCell: UICollectionViewCell {
     var dayLabelSelectedColor: UIColor = .white
 
     var dayLabelSelectedBackgroundColor: UIColor = .black
+
+    var dayLabelSelectedBorderColor: UIColor?
+    var dayLabelSelectedBorderWidth: CGFloat = 0
 
     var day: Int = 1 {
         didSet {
@@ -75,14 +83,22 @@ final class YMMonthDayCollectionCell: UICollectionViewCell {
         switch dayLabelAlignment {
         case .left:
             x = dayLabelMargin
-            dayLabel.frame = CGRect(x: dayLabelMargin, y: dayLabelMargin, width: dayLabelHeight, height: dayLabelHeight)
         case .center:
-            x = (bounds.width - dayLabelHeight)/2
+            x = (bounds.width - dayLabelHeight) / 2
         case .right:
             x = bounds.width - dayLabelMargin - dayLabelHeight
         }
-        dayLabel.frame = CGRect(x: x, y: dayLabelMargin, width: dayLabelHeight, height: dayLabelHeight)
-        dayLabel.layer.cornerRadius = dayLabelHeight / 2
+
+        if isDaySelected && selectionBackgroundFillsCell {
+            dayLabel.frame = contentView.bounds
+            dayLabel.layer.cornerRadius = min(contentView.bounds.width, contentView.bounds.height) / 2
+        } else {
+            let y: CGFloat = selectionBackgroundFillsCell
+                ? (contentView.bounds.height - dayLabelHeight) / 2
+                : dayLabelMargin
+            dayLabel.frame = CGRect(x: x, y: y, width: dayLabelHeight, height: dayLabelHeight)
+            dayLabel.layer.cornerRadius = dayLabelHeight / 2
+        }
     }
 
     public func select(withAnimation animation: YMSelectAnimation, completion: YMMonthDayAnimationCompletion? = nil) {
@@ -109,12 +125,25 @@ final class YMMonthDayCollectionCell: UICollectionViewCell {
 
     // - MARK: Animation None
     private func animationWithNone(_ isSelected: Bool, completion: YMMonthDayAnimationCompletion?=nil) {
+        isDaySelected = isSelected
+        setNeedsLayout()
+        layoutIfNeeded()
+
         if isSelected {
             dayLabel.textColor = dayLabelSelectedColor
             dayLabel.backgroundColor = dayLabelSelectedBackgroundColor
+            if let borderColor = dayLabelSelectedBorderColor, dayLabelSelectedBorderWidth > 0 {
+                dayLabel.layer.borderColor = borderColor.cgColor
+                dayLabel.layer.borderWidth = dayLabelSelectedBorderWidth
+            } else {
+                dayLabel.layer.borderColor = nil
+                dayLabel.layer.borderWidth = 0
+            }
         } else {
             dayLabel.textColor = dayLabelColor
             dayLabel.backgroundColor = dayLabelBackgroundColor
+            dayLabel.layer.borderColor = nil
+            dayLabel.layer.borderWidth = 0
         }
         completion?(true)
     }

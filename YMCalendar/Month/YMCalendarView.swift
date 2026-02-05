@@ -619,6 +619,9 @@ extension YMCalendarView: UICollectionViewDataSource {
         cell.dayLabelBackgroundColor = appearance.calendarViewAppearance(self, dayLabelBackgroundColorAtDate: date)
         cell.dayLabelSelectedColor = appearance.calendarViewAppearance(self, dayLabelSelectedTextColorAtDate: date)
         cell.dayLabelSelectedBackgroundColor = appearance.calendarViewAppearance(self, dayLabelSelectedBackgroundColorAtDate: date)
+        cell.dayLabelSelectedBorderColor = appearance.calendarViewAppearance(self, dayLabelSelectedBorderColorAtDate: date)
+        cell.dayLabelSelectedBorderWidth = appearance.calendarViewAppearance(self, dayLabelSelectedBorderWidthAtDate: date)
+        cell.selectionBackgroundFillsCell = appearance.dayLabelSelectionBackgroundFillsCell(in: self)
         cell.dayLabelHeight = dayLabelHeight
 
         // select cells which already selected dates
